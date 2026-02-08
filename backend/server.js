@@ -227,55 +227,32 @@ function checkRateLimit(clientKey) {
 const downloadedVideos = new Map();
 const replicatePredictions = new Map();
 
-/** Replicate（無料）で動画生成を開始 */
+/** 完全無料モード（デモ）- APIキー不要 */
 app.post('/api/generate-video-free', async (req, res) => {
   const { prompt } = req.body || {};
   if (!prompt || typeof prompt !== 'string') {
     return res.status(400).json({ error: 'prompt を送信してください。' });
   }
 
-  const replicate = getReplicate();
-  if (!replicate) {
-    return res.status(500).json({
-      error: 'REPLICATE_API_TOKEN が設定されていません。',
-      needSetup: true
-    });
-  }
-
-  try {
-    // AnimateDiffを使用（アニメーション特化）
-    const enhancedPrompt = `Cute animated character, ${prompt.trim()}, colorful anime style with onomatopoeia text effects, dynamic motion, vibrant colors, simple background`;
-    
-    const prediction = await replicate.predictions.create({
-      version: "1531004ee4c98bad9d6e8b6a2f3e236c8c836e0c94b1d15d5d98f5b47e7b8e3f", // AnimateDiff
-      input: {
-        prompt: enhancedPrompt,
-        num_frames: 16,
-        guidance_scale: 7.5
-      }
-    });
-
-    replicatePredictions.set(prediction.id, { prompt: prompt.trim() });
-    return res.json({
-      videoId: prediction.id,
-      status: 'processing',
-      provider: 'replicate'
-    });
-  } catch (err) {
-    console.error('Replicate生成エラー:', err);
-    return res.status(500).json({ error: err.message || 'Replicate API でエラーが発生しました。' });
-  }
+  // デモモード: 既存の動画をランダムに返す
+  const demoVideoId = 'demo-' + Date.now();
+  replicatePredictions.set(demoVideoId, { 
+    prompt: prompt.trim(),
+    demoMode: true,
+    status: 'processing'
+  });
+  
+  return res.json({
+    videoId: demoVideoId,
+    status: 'processing',
+    provider: 'demo'
+  });
 });
 
-/** Replicate動画の状態を取得 */
+/** デモモード動画の状態を取得 */
 app.get('/api/video-status-free/:videoId', async (req, res) => {
   const { videoId } = req.params;
   if (!videoId) return res.status(400).json({ error: 'videoId が必要です。' });
-
-  const replicate = getReplicate();
-  if (!replicate) {
-    return res.status(500).json({ error: 'REPLICATE_API_TOKEN が設定されていません。' });
-  }
 
   try {
     // すでにダウンロード済みならパスを返す
@@ -288,38 +265,31 @@ app.get('/api/video-status-free/:videoId', async (req, res) => {
       });
     }
 
-    const prediction = await replicate.predictions.get(videoId);
-    const status = prediction.status;
-
-    if (status === 'succeeded' && prediction.output) {
-      // 動画をダウンロード
-      const videoUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
-      const response = await fetch(videoUrl);
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
+    const predData = replicatePredictions.get(videoId);
+    if (predData && predData.demoMode) {
+      // デモモード: 疑似的な遅延後にサンプル動画を返す
+      if (!predData.startTime) {
+        predData.startTime = Date.now();
+        replicatePredictions.set(videoId, predData);
+        return res.json({ status: 'processing', progress: 30 });
+      }
       
-      const safeName = videoId.replace(/[^a-zA-Z0-9_-]/g, '_');
-      const filename = `replicate-${safeName}.mp4`;
-      const filepath = path.join(IMAGES_DIR, filename);
-      if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true });
-      fs.writeFileSync(filepath, buffer);
+      const elapsed = Date.now() - predData.startTime;
+      if (elapsed < 3000) {
+        // 3秒待機（リアルな生成体験のため）
+        const progress = Math.min(90, 30 + Math.floor(elapsed / 50));
+        return res.json({ status: 'processing', progress });
+      }
       
-      const localUrl = `/images/${filename}`;
+      // 3秒後に完成
+      const localUrl = FALLBACK_VIDEO_URL; // images/5.mp4 を使用
       downloadedVideos.set(videoId, localUrl);
-      
-      const predData = replicatePredictions.get(videoId) || {};
       saveHistory({ videoUrl: localUrl, prompt: predData.prompt || '', createdAt: Date.now() });
       
       return res.json({ status: 'completed', progress: 100, videoUrl: localUrl });
     }
 
-    if (status === 'failed') {
-      return res.status(500).json({ error: prediction.error || '動画の生成に失敗しました。', status: 'failed' });
-    }
-
-    // processing状態
-    const progress = status === 'starting' ? 10 : status === 'processing' ? 50 : 0;
-    return res.json({ status, progress });
+    return res.status(404).json({ error: '動画が見つかりません。' });
   } catch (err) {
     return res.status(500).json({
       error: err.message || '状態の取得に失敗しました。'
