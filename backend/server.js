@@ -432,8 +432,8 @@ app.post('/api/generate-video', async (req, res) => {
     return res.status(400).json({ error: `プロンプトは最大 ${promptMaxChars} 文字までです。` });
   }
 
-  // プロンプトをアニメーションキャラクター＋擬音スタイルに変換
-  const enhancedPrompt = `Cute animated character performing action with onomatopoeia text effects. ${prompt.trim()}. Style: colorful 2D animation, expressive cartoon character, Japanese anime style with visible sound effect text (like "ドカーン", "キラキラ", "ピョン"), dynamic motion, vibrant colors, simple background`;
+  // プロンプトをアニメーションキャラクター＋擬音スタイルに変換（英語のみ）
+  const enhancedPrompt = `Cute animated character performing action with onomatopoeia text effects. ${prompt.trim()}. Style: colorful 2D animation, expressive cartoon character, anime style with visible sound effect text, dynamic motion, vibrant colors, simple background`;
 
   try {
     const video = await openai.videos.create({
