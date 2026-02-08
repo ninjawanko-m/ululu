@@ -227,26 +227,71 @@ function checkRateLimit(clientKey) {
 const downloadedVideos = new Map();
 const replicatePredictions = new Map();
 
-/** 完全無料モード（デモ）- APIキー不要 */
+/** 無料モード - Replicate API使用 */
 app.post('/api/generate-video-free', async (req, res) => {
   const { prompt } = req.body || {};
   if (!prompt || typeof prompt !== 'string') {
     return res.status(400).json({ error: 'prompt を送信してください。' });
   }
 
-  // デモモード: 既存の動画をランダムに返す
-  const demoVideoId = 'demo-' + Date.now();
-  replicatePredictions.set(demoVideoId, { 
-    prompt: prompt.trim(),
-    demoMode: true,
-    status: 'processing'
-  });
-  
-  return res.json({
-    videoId: demoVideoId,
-    status: 'processing',
-    provider: 'demo'
-  });
+  const replicate = getReplicate();
+  if (!replicate) {
+    // Replicateが未設定の場合はデモモードに
+    const demoVideoId = 'demo-' + Date.now();
+    replicatePredictions.set(demoVideoId, { 
+      prompt: prompt.trim(),
+      demoMode: true,
+      status: 'processing'
+    });
+    
+    return res.json({
+      videoId: demoVideoId,
+      status: 'processing',
+      provider: 'demo'
+    });
+  }
+
+  try {
+    // AnimateDiff Lightning - 高速アニメーション生成
+    const enhancedPrompt = `Cute animated character, ${prompt.trim()}, colorful anime style with onomatopoeia text effects, dynamic motion, vibrant colors, simple background`;
+    
+    const output = await replicate.run(
+      "lucataco/animate-diff-lightning-4-step:2abe5b1e96b67e63f0423ba0dd9cff588f5b269a96e8a1902172cea0c8a1e868",
+      {
+        input: {
+          prompt: enhancedPrompt,
+          width: 512,
+          height: 512,
+          frames: 16
+        }
+      }
+    );
+
+    // 動画をダウンロード
+    const videoUrl = output;
+    const response = await fetch(videoUrl);
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    
+    const timestamp = Date.now();
+    const filename = `free-${timestamp}.mp4`;
+    const filepath = path.join(IMAGES_DIR, filename);
+    if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true });
+    fs.writeFileSync(filepath, buffer);
+    
+    const localUrl = `/images/${filename}`;
+    saveHistory({ videoUrl: localUrl, prompt: prompt.trim(), createdAt: timestamp });
+    
+    return res.json({
+      videoId: 'free-' + timestamp,
+      status: 'completed',
+      videoUrl: localUrl,
+      provider: 'replicate'
+    });
+  } catch (err) {
+    console.error('Replicate生成エラー:', err);
+    return res.status(500).json({ error: err.message || 'Replicate API でエラーが発生しました。' });
+  }
 });
 
 /** デモモード動画の状態を取得 */

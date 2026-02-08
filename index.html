@@ -951,10 +951,10 @@
                 <div class="form-row">
                     <label class="form-label">生成モード</label>
                     <select id="generation-mode" class="form-control" style="margin-bottom: 0.75rem;">
-                        <option value="free" selected>🆓 無料モード（デモ・APIキー不要）</option>
+                        <option value="free" selected>🆓 無料モード（Replicate - 月$5無料枠）</option>
                         <option value="sora">⚡ Sora モード（有料・高品質）</option>
                     </select>
-                    <small style="color: #888; font-size: 0.85rem;">無料モードはサンプル動画を即座に返します（APIキー不要）</small>
+                    <small style="color: #888; font-size: 0.85rem;">無料モードはAnimateDiff Lightningで実際にAI生成（約10-20秒）。<a href="https://replicate.com/account/api-tokens" target="_blank" rel="noopener" style="color: var(--accent-pink);">Replicateトークン取得</a></small>
                 </div>
                 <div class="form-row">
                     <label class="form-label">あなたのAPIキー（任意）</label>
@@ -1420,37 +1420,11 @@
             soraProgress.textContent = 'リクエスト送信中...';
 
             try {
-                // 無料モードは完全にフロントエンドで処理（バックエンド不要）
-                if (generationMode === 'free') {
-                    // 3秒の疑似生成プロセス
-                    let progress = 30;
-                    soraProgress.textContent = '生成中... ' + progress + '%';
-                    
-                    const interval = setInterval(() => {
-                        progress += 15;
-                        if (progress < 95) {
-                            soraProgress.textContent = '生成中... ' + progress + '%';
-                        }
-                    }, 500);
-                    
-                    setTimeout(() => {
-                        clearInterval(interval);
-                        soraProgress.textContent = '完了！100%';
-                        
-                        // images/5.mp4 を使用
-                        const videoUrl = window.location.origin + '/images/5.mp4';
-                        addVideoItem('無料モード', prompt.slice(0, 80) + (prompt.length > 80 ? '...' : ''), videoUrl, [], 0);
-                        soraProgress.style.display = 'none';
-                        soraPrompt.value = '';
-                        soraGenerateBtn.disabled = false;
-                    }, 3000);
-                    
-                    return;
-                }
-                
-                // Soraモードはバックエンド経由
-                const endpoint = '/api/generate-video';
-                const body = { prompt, userApiKey: userApiKey || undefined, speedMode };
+                // 無料モードかSoraモードか
+                const endpoint = generationMode === 'free' ? '/api/generate-video-free' : '/api/generate-video';
+                const body = generationMode === 'free' 
+                    ? { prompt }
+                    : { prompt, userApiKey: userApiKey || undefined, speedMode };
                 
                 const createRes = await fetch(SORA_API_BASE + endpoint, {
                     method: 'POST',
@@ -1481,6 +1455,17 @@
                     showSoraError(createData.error || 'リクエストに失敗しました。', createData.needSetup);
                     return;
                 }
+                
+                // 無料モードで即座に完了した場合（Replicate使用時）
+                if (generationMode === 'free' && createData.status === 'completed' && createData.videoUrl) {
+                    const videoUrl = createData.videoUrl.startsWith('http') ? createData.videoUrl : (SORA_API_BASE + createData.videoUrl);
+                    addVideoItem('無料モード（AI生成）', prompt.slice(0, 80) + (prompt.length > 80 ? '...' : ''), videoUrl, [], 0);
+                    soraProgress.style.display = 'none';
+                    soraPrompt.value = '';
+                    soraGenerateBtn.disabled = false;
+                    return;
+                }
+                
                 const videoId = createData.videoId;
                 
                 // 疑似進捗表示（滑らかに）
