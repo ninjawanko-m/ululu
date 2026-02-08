@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PROFILE - ULULU</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Italiana&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #333333;
+            --text-body: #444444;
+            --accent-pink: #ff8cb6;
+            --accent-blue: #70e8e0;
+            --accent-gold: #f0d550;
+            --bg-color: #ffffff;
+            --glass-bg: rgba(255, 255, 255, 0.9);
+            --glass-border: rgba(255, 255, 255, 1.0);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            font-family: 'Zen Kaku Gothic New', sans-serif;
+            color: var(--primary-color);
+            overflow: hidden;
+            height: 100vh;
+            line-height: 1.8;
+        }
+
+        body.loaded {
+            overflow-y: auto; 
+            height: auto;
+        }
+
+        /* Loading Screen */
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1), 
+                        transform 1.2s cubic-bezier(0.4, 0, 0.2, 1),
+                        visibility 1.2s;
+        }
+
+        #loading-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transform: scale(1.1);
+        }
+
+        .loading-logo {
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
+            font-size: 3.5rem;
+            color: var(--accent-pink);
+            margin-bottom: 1.5rem;
+            text-shadow: 0px 0px 15px rgba(255, 140, 182, 0.3);
+        }
+
+        .loading-bar-container {
+            width: 200px;
+            height: 4px;
+            background: #f5f5f5;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .loading-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-pink));
+            transition: width 0.1s linear;
+        }
+        
+        .loading-text {
+            margin-top: 1rem;
+            font-family: 'Italiana', serif;
+            font-size: 0.9rem;
+            letter-spacing: 0.2em;
+            color: #888;
+        }
+
+        /* Background Canvas */
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 1.0; 
+        }
+
+        /* Main Content Layout */
+        .page-container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            opacity: 0;
+            transition: opacity 1.5s ease;
+        }
+        
+        .page-container.visible {
+            opacity: 1;
+        }
+
+        section {
+            min-height: 100vh;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 6rem 2rem;
+            box-sizing: border-box;
+        }
+
+        h1, h2, h3 { margin: 0; }
+
+        .section-title {
+            font-family: 'Italiana', serif;
+            font-size: clamp(2.8rem, 5vw, 4.5rem);
+            margin-bottom: 4rem;
+            background: linear-gradient(45deg, var(--accent-pink), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            position: relative;
+            display: inline-block;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05));
+        }
+        
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            right: 0;
+            padding: 2.5rem 4rem;
+            z-index: 100;
+            display: flex;
+            gap: 2.5rem;
+            opacity: 0;
+            transition: opacity 1s ease 1s;
+        }
+        .loaded nav { opacity: 1; }
+
+        .nav-item {
+            text-decoration: none;
+            color: var(--primary-color);
+            font-family: 'Italiana', serif;
+            font-size: 1.2rem;
+            position: relative;
+            letter-spacing: 0.1em;
+            transition: color 0.3s;
+            font-weight: 600;
+        }
+        .nav-item:hover { color: var(--accent-pink); }
+
+        /* Hero Section */
+        .hero-section {
+            height: 100vh;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero-content {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 1.8s cubic-bezier(0.2, 1, 0.3, 1) 0.5s;
+        }
+        .loaded .hero-content {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .hero-logo {
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
+            font-size: clamp(1.4rem, 2.5vw, 2rem);
+            color: var(--accent-pink);
+            letter-spacing: 0.1em;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .hero-title {
+            font-family: 'Italiana', serif;
+            font-size: clamp(4.5rem, 12vw, 9.5rem);
+            font-weight: 400;
+            line-height: 0.9;
+            color: var(--primary-color);
+            margin-bottom: 2rem;
+            letter-spacing: -0.03em;
+        }
+
+        .hero-desc {
+            font-size: 1.1rem;
+            letter-spacing: 0.15em;
+            color: #666;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .scroll-hint {
+            position: absolute;
+            bottom: 3rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Italiana', serif;
+            font-size: 0.9rem;
+            letter-spacing: 0.2em;
+            color: var(--accent-pink);
+            font-weight: bold;
+            animation: bounce 2s infinite;
+            opacity: 0;
+            transition: opacity 1s ease 1.5s;
+        }
+        .loaded .scroll-hint { opacity: 1; }
+
+        /* About Section */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border: 1px solid #fff;
+            border-radius: 20px;
+            padding: 5rem 4rem;
+            width: 100%;
+            max-width: 1000px;
+            box-shadow: 0 20px 60px rgba(255, 140, 182, 0.1); 
+            display: flex;
+            flex-direction: row;
+            gap: 5rem;
+            align-items: center;
+            opacity: 0;
+            transform: translateY(40px);
+            transition: all 1s ease;
+        }
+
+        @media (max-width: 800px) {
+            .glass-card {
+                flex-direction: column;
+                padding: 3rem 2rem;
+                gap: 2.5rem;
+            }
+        }
+
+        .glass-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .profile-img-wrapper {
+            flex: 1;
+            overflow: hidden;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.05);
+            max-width: 380px;
+            width: 100%;
+            position: relative;
+        }
+        
+        .profile-img-wrapper::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 1px solid rgba(255,255,255,0.7);
+            border-radius: 12px;
+            pointer-events: none;
+        }
+
+        .profile-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            transition: transform 0.8s ease;
+        }
+        .profile-img-wrapper:hover .profile-img {
+            transform: scale(1.05);
+        }
+
+        .profile-text {
+            flex: 1.3;
+            text-align: left;
+        }
+
+        .profile-name {
+            font-family: 'Italiana', serif;
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary-color);
+        }
+        .profile-role {
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
+            font-size: 1.2rem;
+            color: var(--accent-pink);
+            letter-spacing: 0.05em;
+            margin-bottom: 2rem;
+            display: block;
+            font-weight: 600;
+        }
+        .profile-desc {
+            line-height: 2.2;
+            color: var(--text-body);
+            margin-bottom: 2.5rem;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        /* Works Section (Padding Fixed) */
+        .slider-section {
+            padding: 6rem 0 0 0; /* タイトルが見切れないよう上部余白を追加 */
+            height: 100vh;
+            overflow: hidden;
+            background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255, 245, 250, 0.5) 100%);
+        }
+
+        .slider-container {
+            width: 100%;
+            max-width: 1200px;
+            height: 100%;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .slider-header-wrapper {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            position: relative;
+            z-index: 20;
+        }
+
+        .slider-wrapper {
+            display: flex;
+            transition: transform 0.8s cubic-bezier(0.2, 1, 0.3, 1);
+            width: 100%;
+            padding: 2rem 0;
+        }
+
+        .slide {
+            min-width: 100%;
+            padding: 0 1rem;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0.4;
+            transition: opacity 0.6s ease, transform 0.6s ease;
+            transform: scale(0.92);
+        }
+        
+        .slide.active {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .work-card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            padding: 3.5rem;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(200, 200, 255, 0.1);
+            display: flex;
+            flex-direction: row;
+            gap: 4rem;
+            width: 100%;
+            max-width: 1000px;
+            align-items: center;
+            border: 1px solid #fff;
+        }
+
+        @media (max-width: 768px) {
+            .work-card {
+                flex-direction: column;
+                padding: 2.5rem;
+                gap: 2rem;
+            }
+        }
+
+        .work-img-area {
+            flex: 1.2;
+            overflow: hidden;
+            border-radius: 12px;
+            position: relative;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.05);
+            background-color: #ffeef5;
+        }
+        .work-img {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 4/3;
+            object-fit: cover;
+            transition: transform 1s ease;
+            display: block;
+        }
+        .work-card:hover .work-img {
+            transform: scale(1.08);
+        }
+
+        .work-info {
+            flex: 1.2;
+            text-align: left;
+        }
+
+        .work-cat {
+            font-family: 'Italiana', serif;
+            font-size: 1rem;
+            color: var(--accent-blue);
+            letter-spacing: 0.1em;
+            margin-bottom: 0.8rem;
+            display: block;
+            font-weight: 700;
+        }
+        .work-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.8rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.1;
+            color: var(--primary-color);
+        }
+        .work-desc {
+            font-size: 1.05rem;
+            line-height: 2;
+            color: var(--text-body);
+            margin-bottom: 2.5rem;
+            font-weight: 500;
+        }
+
+        .slider-controls {
+            display: flex;
+            justify-content: center;
+            gap: 3rem;
+            margin-top: 2rem;
+            z-index: 20;
+        }
+        .nav-btn {
+            width: 60px;
+            height: 60px;
+            border: 2px solid #fff;
+            background: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            font-family: 'Playfair Display', serif;
+            font-size: 1.5rem;
+            color: var(--accent-pink);
+            padding-bottom: 4px;
+            font-weight: bold;
+        }
+        .nav-btn:hover {
+            transform: scale(1.1);
+            background: var(--accent-pink);
+            color: #fff;
+            box-shadow: 0 10px 25px rgba(255, 140, 182, 0.4);
+            border-color: var(--accent-pink);
+        }
+
+        /* Video Section */
+        .video-section {
+            padding: 6rem 2rem;
+            background: linear-gradient(to bottom, rgba(255, 245, 250, 0.5) 0%, rgba(255,255,255,0) 50%, rgba(255,255,255,0) 100%);
+        }
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2.5rem;
+            width: 100%;
+            max-width: 1200px;
+            margin-top: 3rem;
+        }
+        .video-item {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+        }
+        .video-item.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .video-item .video-card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(200, 200, 255, 0.1);
+            border: 1px solid #fff;
+        }
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: #1a1a1a;
+        }
+        .video-wrapper video,
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border: none;
+        }
+        .video-wrapper video {
+            object-fit: contain;
+        }
+        .video-caption {
+            padding: 1.5rem;
+            text-align: left;
+        }
+        .video-caption .video-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.4rem;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+        .video-caption .video-desc {
+            font-size: 0.95rem;
+            color: var(--text-body);
+            line-height: 1.7;
+        }
+
+        /* Sora 生成フォーム */
+        .sora-form-box {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2.5rem;
+            margin-bottom: 2.5rem;
+            width: 100%;
+            max-width: 1200px;
+            border: 1px solid #fff;
+            box-shadow: 0 20px 60px rgba(200, 200, 255, 0.1);
+        }
+        .sora-form-box h3 {
+            font-family: 'Italiana', serif;
+            font-size: 1.5rem;
+            color: var(--accent-pink);
+            margin-bottom: 1rem;
+        }
+        .sora-form-box .form-row { margin-bottom: 1.5rem; }
+        .sora-form-box .form-label { margin-bottom: 0.5rem; }
+        .sora-form-box textarea.form-control { min-height: 80px; }
+        .sora-generate-btn {
+            padding: 1rem 2.5rem;
+            background: linear-gradient(45deg, var(--accent-pink), #ffbedb);
+            color: #fff;
+            border: none;
+            font-family: 'Italiana', serif;
+            font-size: 1.2rem;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            border-radius: 50px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .sora-generate-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(255, 140, 182, 0.4);
+        }
+        .sora-generate-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        .sora-progress {
+            margin-top: 1rem;
+            font-size: 0.95rem;
+            color: var(--text-body);
+        }
+        .sora-error {
+            margin-top: 1rem;
+            color: #c44;
+            font-size: 0.95rem;
+        }
+        .sora-setup-hint {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #fff8f0;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            color: var(--text-body);
+        }
+        .sora-setup-btn {
+            display: inline-block;
+            margin-top: 0.75rem;
+            padding: 0.6rem 1.2rem;
+            background: linear-gradient(45deg, var(--accent-pink), #ffbedb);
+            color: #fff;
+            border: none;
+            border-radius: 50px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        .sora-setup-btn:hover { opacity: 0.95; transform: translateY(-1px); }
+
+        /* Contact Section */
+        .contact-form-wrapper {
+            position: relative; /* 重なり順を制御するために追加 */
+            z-index: 50;        /* 他の要素より手前に表示 */
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(30px);
+            padding: 4rem 5rem;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 650px;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s ease;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.05);
+            text-align: center;
+            border: 1px solid #fff;
+        }
+        .contact-form-wrapper.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .contact-intro {
+            margin-bottom: 3rem;
+            line-height: 2;
+            color: var(--text-body);
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .form-row {
+            margin-bottom: 2.5rem;
+            text-align: left;
+        }
+        .form-label {
+            display: block;
+            font-family: 'Italiana', serif;
+            font-size: 1.1rem;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.8rem;
+            color: var(--accent-pink);
+            font-weight: 800;
+        }
+        .form-control {
+            width: 100%;
+            padding: 1.2rem;
+            border: 2px solid #eee;
+            border-radius: 10px;
+            background: #fff;
+            font-family: inherit;
+            font-size: 1.1rem;
+            transition: all 0.3s;
+            box-sizing: border-box;
+            color: #333;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: var(--accent-pink);
+            box-shadow: 0 0 0 4px rgba(255, 140, 182, 0.15);
+        }
+        
+        .submit-btn {
+            margin-top: 1rem;
+            display: inline-block;
+            padding: 1.2rem 5rem;
+            background: linear-gradient(45deg, var(--accent-pink), #ffbedb);
+            color: #fff;
+            border: none;
+            font-family: 'Italiana', serif;
+            font-size: 1.3rem;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 50px;
+            box-shadow: 0 10px 20px rgba(255, 140, 182, 0.3);
+            font-weight: bold;
+        }
+        .submit-btn:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 15px 30px rgba(255, 140, 182, 0.5);
+        }
+
+        footer {
+            padding: 3rem;
+            font-size: 0.9rem;
+            color: #888;
+            text-align: center;
+            font-family: 'Italiana', serif;
+            letter-spacing: 0.05em;
+            font-weight: bold;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translate(-50%, 0); }
+            50% { transform: translate(-50%, 10px); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="loading-screen">
+        <div class="loading-logo">ULULU</div>
+        <div class="loading-bar-container">
+            <div class="loading-bar" id="loading-bar"></div>
+        </div>
+        <p class="loading-text">LOADING...</p>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <div class="page-container">
+
+        <nav>
+            <a href="#about" class="nav-item">About</a>
+            <a href="#works" class="nav-item">Favorites</a>
+            <a href="#video" class="nav-item">Video</a>
+            <a href="#contact" class="nav-item">Contact</a>
+        </nav>
+
+        <section class="hero-section">
+            <div class="hero-content">
+                <span class="hero-logo">My Profile</span>
+                <h1 class="hero-title">ULULU<br>Official</h1>
+                <p class="hero-desc">
+                    Sparkling Dream Guardian
+                </p>
+            </div>
+            <div class="scroll-hint">SCROLL DOWN</div>
+        </section>
+
+        <section id="about">
+            <h2 class="section-title">About Me</h2>
+            <div class="glass-card scroll-anim">
+                <div class="profile-img-wrapper">
+                    <img src="images/1.jpg" alt="Profile" class="profile-img">
+                </div>
+                <div class="profile-text">
+                    <h3 class="profile-name">ULULU</h3>
+                    <span class="profile-role">Sparkling Dream Guardian</span>
+                    <p class="profile-desc">
+                        私の好きなものや、日々の「推し」を紹介するサイトです。<br>
+                        ゆっくりしていってくださいね！
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section id="works" class="slider-section">
+            <div class="slider-container">
+                <div class="slider-header-wrapper">
+                    <h2 class="section-title" style="margin-bottom: 0;">My Favorites</h2>
+                </div>
+
+                <div class="slider-wrapper" id="sliderWrapper">
+                    
+                    <div class="slide active">
+                        <div class="work-card">
+                            <div class="work-img-area">
+                                <img src="images/2.jpg" alt="Work 1" class="work-img">
+                            </div>
+                            <div class="work-info">
+                                <span class="work-cat">Favorite 01</span>
+                                <h3 class="work-title">Cotton Candy Clouds</h3>
+                                <p class="work-desc">
+                                    空に浮かぶふわふわの雲が好物。食べるとお腹もココロも満たされて、もっと高く飛べるようになるんだ！
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="slide">
+                        <div class="work-card">
+                            <div class="work-img-area">
+                                <img src="images/3.jpg" alt="Work 2" class="work-img">
+                            </div>
+                            <div class="work-info">
+                                <span class="work-cat">Favorite 02</span>
+                                <h3 class="work-title">Shooting Stars</h3>
+                                <p class="work-desc">
+                                    夜空を駆ける星を見つけるのが得意。見つけるたびに瞳のキラキラが強くなって、みんなに幸運を分けてあげられるよ。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="slide">
+                        <div class="work-card">
+                            <div class="work-img-area">
+                                <img src="images/4.jpg" alt="Work 3" class="work-img">
+                            </div>
+                            <div class="work-info">
+                                <span class="work-cat">Favorite 03</span>
+                                <h3 class="work-title">Human Smiles</h3>
+                                <p class="work-desc">
+                                    ボクのラッキーパウダーで誰かが笑顔になる瞬間が一番好き！その笑顔がボクの元気の源なんだ。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="slider-controls">
+                    <div class="nav-btn" id="prevBtn">〈</div>
+                    <div class="nav-btn" id="nextBtn">〉</div>
+                </div>
+            </div>
+        </section>
+
+        <section id="video">
+            <h2 class="section-title">Video</h2>
+            <p style="color: var(--text-body); margin-bottom: 1rem;">お気に入りの動画を貼れます（YouTube / Vimeo / ローカル動画 / Soraで自動生成）</p>
+
+            <div class="sora-form-box scroll-anim">
+                <h3>Sora で動画を自動生成</h3>
+                <p style="color: var(--text-body); font-size: 0.95rem; margin-bottom: 0.5rem;">プロンプトを入力して生成ボタンを押すと、Sora で動画が生成され、下の一覧に追加されます。</p>
+                <p style="color: var(--text-body); font-size: 0.85rem; margin-bottom: 1rem;">制限: 1分あたり2回 / 1日5回、最大4秒・720p、プロンプト200文字まで</p>
+                <div class="form-row">
+                    <label class="form-label">プロンプト（英語推奨）</label>
+                    <textarea id="sora-prompt" class="form-control" placeholder="例: A cute cat playing with a ball of yarn in a sunny room" rows="3"></textarea>
+                </div>
+                <button type="button" id="sora-generate-btn" class="sora-generate-btn">Sora で生成</button>
+                <div id="sora-progress" class="sora-progress" style="display: none;"></div>
+                <div id="sora-error" class="sora-error" style="display: none;"></div>
+                <div id="sora-setup-hint" class="sora-setup-hint" style="display: none;"></div>
+                <a id="sora-setup-btn" href="#" target="_blank" rel="noopener" class="sora-setup-btn" style="display: none;">API キーを設定する</a>
+            </div>
+
+            <div class="video-grid">
+                <!-- 例: YouTube埋め込み（srcのURLを差し替えて使う） -->
+                <div class="video-item scroll-anim">
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="YouTube" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                        </div>
+                        <div class="video-caption">
+                            <div class="video-title">サンプル動画</div>
+                            <p class="video-desc">YouTubeの「埋め込み」で取得したURLを iframe の src に貼り付けてください。</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- 例: ローカル動画（videos/ フォルダに .mp4 を置いてパスを指定） -->
+                <div class="video-item scroll-anim">
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <video controls playsinline>
+                                <source src="images/5.mp4" type="video/mp4">
+                                お使いのブラウザは動画タグに対応していません。
+                            </video>
+                        </div>
+                        <div class="video-caption">
+                            <div class="video-title">ローカル動画</div>
+                            <p class="video-desc">images/5.mp4 を再生します。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="contact">
+            <h2 class="section-title">Contact</h2>
+            <div class="contact-form-wrapper scroll-anim">
+                <p class="contact-intro">
+                    感想やメッセージをお待ちしています！
+                </p>
+                <form id="myContactForm">
+                    <div class="form-row">
+                        <label class="form-label">Name</label>
+                        <input type="text" name="name" class="form-control" placeholder="お名前" required>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control" placeholder="メールアドレス" required>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">Message</label>
+                        <textarea name="message" class="form-control" rows="4" placeholder="メッセージ" style="resize: vertical;" required></textarea>
+                    </div>
+                    <button type="submit" class="submit-btn">Send Message</button>
+                </form>
+            </div>
+            <footer>
+                &copy; 2026 ULULU. All Rights Reserved.
+            </footer>
+        </section>
+
+    </div>
+
+    <script>
+        // --- Loading Logic ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const loadingScreen = document.getElementById('loading-screen');
+            const loadingBar = document.getElementById('loading-bar');
+            const pageContainer = document.querySelector('.page-container');
+            const body = document.body;
+            
+            let progress = 0;
+            const timer = setInterval(() => {
+                progress += Math.random() * 4; 
+                if(progress >= 100) {
+                    progress = 100;
+                    clearInterval(timer);
+                    loadingBar.style.width = "100%";
+                    
+                    setTimeout(() => {
+                        loadingScreen.classList.add('hidden');
+                        pageContainer.classList.add('visible');
+                        body.classList.add('loaded');
+                        setTimeout(() => loadingScreen.style.display = 'none', 1500);
+                    }, 600);
+                } else {
+                    loadingBar.style.width = progress + "%";
+                }
+            }, 20);
+        });
+
+        // --- Scroll Animation ---
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.15 });
+
+        document.querySelectorAll('.scroll-anim').forEach(el => observer.observe(el));
+
+        // --- Slider Logic ---
+        const sliderWrapper = document.getElementById('sliderWrapper');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        let isAnimating = false;
+
+        function updateClasses() {
+            Array.from(sliderWrapper.children).forEach((slide, index) => {
+                if (index === 0) slide.classList.add('active');
+                else slide.classList.remove('active');
+            });
+        }
+
+        function moveNext() {
+            if(isAnimating) return;
+            isAnimating = true;
+            
+            sliderWrapper.style.transition = 'transform 0.8s cubic-bezier(0.2, 1, 0.3, 1)';
+            sliderWrapper.style.transform = 'translateX(-100%)';
+            
+            setTimeout(() => {
+                sliderWrapper.style.transition = 'none';
+                sliderWrapper.appendChild(sliderWrapper.firstElementChild);
+                sliderWrapper.style.transform = 'translateX(0)';
+                updateClasses();
+                isAnimating = false;
+            }, 800);
+        }
+
+        function movePrev() {
+            if(isAnimating) return;
+            isAnimating = true;
+            
+            sliderWrapper.style.transition = 'none';
+            sliderWrapper.prepend(sliderWrapper.lastElementChild);
+            sliderWrapper.style.transform = 'translateX(-100%)';
+            
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    sliderWrapper.style.transition = 'transform 0.8s cubic-bezier(0.2, 1, 0.3, 1)';
+                    sliderWrapper.style.transform = 'translateX(0)';
+                });
+            });
+            
+            setTimeout(() => {
+                updateClasses();
+                isAnimating = false;
+            }, 800);
+        }
+
+        nextBtn.addEventListener('click', moveNext);
+        prevBtn.addEventListener('click', movePrev);
+        setInterval(moveNext, 5000); // Auto Play
+
+        // --- Contact Form Logic (GAS Integration) ---
+        const contactForm = document.getElementById('myContactForm');
+        contactForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            // Gemによって置換されるGASのURL
+            const scriptURL = 'https://script.google.com/macros/s/AKfycbwaa3eK1R9Ht-TbDF26a1A8w0sR-Mh1hXNGvLHk5Dm0gNnG77AIQyDQcYhFBtzi0Tr1aA/exec'; 
+
+            if(!scriptURL || scriptURL === 'なし' || scriptURL.includes('{{')) {
+                alert('【デモモード】\n送信機能は設定されていません。\n本来はここにGASの処理が入ります。');
+                contactForm.reset();
+                return;
+            }
+
+            // URLが設定されている場合の送信処理
+            const formData = new FormData(contactForm);
+            const data = {};
+            formData.forEach((value, key) => data[key] = value);
+
+            const btn = contactForm.querySelector('button');
+            const originalText = btn.innerText;
+            btn.innerText = 'Sending...';
+            btn.disabled = true;
+
+            fetch(scriptURL, {
+                method: 'POST',
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                alert('メッセージを送信しました！');
+                contactForm.reset();
+            })
+            .catch(error => {
+                console.error('Error!', error.message);
+                alert('送信に失敗しました。');
+            })
+            .finally(() => {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            });
+        });
+
+        // --- Sora 動画自動生成 ---
+        const SORA_API_BASE = 'http://localhost:3001';
+        const soraPrompt = document.getElementById('sora-prompt');
+        const soraGenerateBtn = document.getElementById('sora-generate-btn');
+        const soraProgress = document.getElementById('sora-progress');
+        const soraError = document.getElementById('sora-error');
+        const soraSetupHint = document.getElementById('sora-setup-hint');
+        const soraSetupBtn = document.getElementById('sora-setup-btn');
+        const videoGrid = document.querySelector('.video-grid');
+
+        function showSoraError(msg, showHint) {
+            soraError.textContent = msg;
+            soraError.style.display = 'block';
+            soraProgress.style.display = 'none';
+            if (showHint) {
+                soraSetupHint.textContent = 'API キーを1回だけ設定すると Sora で動画生成が使えます。';
+                soraSetupHint.style.display = 'block';
+                soraSetupBtn.href = SORA_API_BASE + '/setup';
+                soraSetupBtn.style.display = 'inline-block';
+            } else {
+                soraSetupHint.style.display = 'none';
+                soraSetupBtn.style.display = 'none';
+            }
+        }
+        function hideSoraMessages() {
+            soraError.style.display = 'none';
+            soraProgress.style.display = 'none';
+            soraSetupHint.style.display = 'none';
+            soraSetupBtn.style.display = 'none';
+        }
+        function addVideoItem(title, desc, videoUrl) {
+            const item = document.createElement('div');
+            item.className = 'video-item scroll-anim visible';
+            item.innerHTML = '<div class="video-card"><div class="video-wrapper"><video controls playsinline><source src="' + videoUrl + '" type="video/mp4"></video></div><div class="video-caption"><div class="video-title">' + escapeHtml(title) + '</div><p class="video-desc">' + escapeHtml(desc) + '</p></div></div>';
+            videoGrid.insertBefore(item, videoGrid.firstChild);
+            observer.observe(item);
+        }
+
+        soraGenerateBtn.addEventListener('click', async () => {
+            const prompt = (soraPrompt.value || '').trim();
+            if (!prompt) {
+                showSoraError('プロンプトを入力してください。');
+                return;
+            }
+            soraGenerateBtn.disabled = true;
+            hideSoraMessages();
+            soraProgress.style.display = 'block';
+            soraProgress.textContent = 'リクエスト送信中...';
+
+            try {
+                const createRes = await fetch(SORA_API_BASE + '/api/generate-video', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+                const createData = await createRes.json();
+                if (!createRes.ok) {
+                    if (createData.fallback && createData.videoUrl) {
+                        const fallbackUrl = createData.videoUrl.startsWith('http') ? createData.videoUrl : (window.location.origin + createData.videoUrl);
+                        addVideoItem('フォールバック動画', '課金上限のためローカル動画を表示しています。', fallbackUrl);
+                        soraProgress.style.display = 'none';
+                        soraPrompt.value = '';
+                        soraGenerateBtn.disabled = false;
+                        return;
+                    }
+                    if (createData.reason === 'rate_limit') {
+                        const wait = createData.retryAfter ? `（${createData.retryAfter}秒後に再試行）` : '';
+                        showSoraError('利用制限に達しました。しばらく待ってから再試行してください。' + wait);
+                        soraGenerateBtn.disabled = false;
+                        return;
+                    }
+                    showSoraError(createData.error || 'リクエストに失敗しました。', createData.needSetup);
+                    return;
+                }
+                const videoId = createData.videoId;
+                soraProgress.textContent = '生成中... 0%';
+
+                const poll = async () => {
+                    const statusRes = await fetch(SORA_API_BASE + '/api/video-status/' + encodeURIComponent(videoId));
+                    const statusData = await statusRes.json();
+                    if (!statusRes.ok) {
+                        showSoraError(statusData.error || '状態の取得に失敗しました。');
+                        return;
+                    }
+                    const status = statusData.status;
+                    const progress = statusData.progress ?? 0;
+                    soraProgress.textContent = status === 'completed' ? '完了！' : '生成中... ' + progress + '%';
+
+                    if (status === 'completed' && statusData.videoUrl) {
+                        const videoUrl = statusData.videoUrl.startsWith('http') ? statusData.videoUrl : (window.location.origin + statusData.videoUrl);
+                        addVideoItem('Sora で生成', prompt.slice(0, 80) + (prompt.length > 80 ? '...' : ''), videoUrl);
+                        soraProgress.style.display = 'none';
+                        soraPrompt.value = '';
+                    } else if (status === 'failed') {
+                        showSoraError(statusData.error || '動画の生成に失敗しました。');
+                    } else {
+                        setTimeout(poll, 5000);
+                        return;
+                    }
+                    soraGenerateBtn.disabled = false;
+                };
+                await poll();
+            } catch (err) {
+                showSoraError('サーバーに接続できません。backend で npm install と node server.js を実行していますか？', true);
+            }
+            soraGenerateBtn.disabled = false;
+        });
+        function escapeHtml(s) {
+            const div = document.createElement('div');
+            div.textContent = s;
+            return div.innerHTML;
+        }
+
+        // --- Three.js Fluid Simulation ---
+        
+        let simMaterial, drawMaterial;
+        let renderer, scene, camera;
+        let targetA, targetB;
+        let simScene, drawScene;
+        let simQuad, drawQuad;
+
+        function initThreeJS() {
+            const container = document.getElementById('canvas-container');
+            if (!container) return;
+
+            scene = new THREE.Scene();
+            camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+            renderer = new THREE.WebGLRenderer({ alpha: false, antialias: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+
+            const size = new THREE.Vector2(window.innerWidth, window.innerHeight);
+            targetA = new THREE.WebGLRenderTarget(size.x, size.y, {
+                minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+                format: THREE.RGBAFormat, type: THREE.FloatType,
+                depthBuffer: false, stencilBuffer: false
+            });
+            targetB = targetA.clone();
+
+            const simFragmentShader = `
+                uniform sampler2D u_buffer; 
+                uniform vec2 u_resolution; 
+                uniform vec2 u_mouse;
+                uniform float u_dt; 
+                uniform float u_is_moving; 
+                uniform float u_time;
+
+                vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+                vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+                vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
+                float snoise(vec2 v) {
+                    const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+                    vec2 i = floor(v + dot(v, C.yy)); vec2 x0 = v - i + dot(i, C.xx);
+                    vec2 i1; i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+                    vec4 x12 = x0.xyxy + C.xxzz; x12.xy -= i1;
+                    i = mod289(i); vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+                    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+                    m = m*m; m = m*m; vec3 x = 2.0 * fract(p * C.www) - 1.0;
+                    vec3 h = abs(x) - 0.5; vec3 ox = floor(x + 0.5); vec3 a0 = x - ox;
+                    m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
+                    vec3 g; g.x = a0.x * x0.x + h.x * x0.y; g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+                    return 130.0 * dot(m, g);
+                }
+                
+                vec2 curl(vec2 p) {
+                    float eps = 0.001; float n = snoise(p);
+                    float a = snoise(p + vec2(eps, 0.0)); float b = snoise(p + vec2(0.0, eps));
+                    return vec2(b - n, -(a - n)) / eps;
+                }
+
+                vec3 getHoloPalette(float t) {
+                    vec3 tiffany = vec3(0.3, 0.9, 0.95); 
+                    vec3 pink    = vec3(1.0, 0.6, 0.8); 
+                    vec3 gold    = vec3(1.0, 0.9, 0.4); 
+                    vec3 lilac   = vec3(0.8, 0.7, 1.0); 
+                    
+                    float cycle = mod(t * 0.15, 4.0); 
+                    float idx = floor(cycle); 
+                    float f = fract(cycle);
+                    
+                    if (idx == 0.0) return mix(tiffany, pink, f); 
+                    if (idx == 1.0) return mix(pink, gold, f);
+                    if (idx == 2.0) return mix(gold, lilac, f); 
+                    return mix(lilac, tiffany, f);
+                }
+
+                void main() {
+                    vec2 uv = gl_FragCoord.xy / u_resolution.xy; 
+                    vec2 texel = 1.0 / u_resolution.xy;
+                    vec2 aspect = vec2(u_resolution.x / u_resolution.y, 1.0);
+                    
+                    float dist = distance(uv * aspect, u_mouse * aspect);
+                    float radius = 0.05; 
+                    float intensity = exp(-pow(dist / radius, 2.0)) * u_is_moving;
+                    
+                    vec3 newColor = getHoloPalette(u_time);
+                    
+                    vec2 flow = curl(uv * 1.2 + u_time * 0.002); 
+                    vec2 offset = flow * 0.002;
+                    vec2 samplePos = uv - offset; 
+                    
+                    vec4 prevColor = texture2D(u_buffer, samplePos);
+                    
+                    float spread = 1.0; 
+                    vec4 up = texture2D(u_buffer, samplePos + vec2(0.0, texel.y) * spread);
+                    vec4 down = texture2D(u_buffer, samplePos - vec2(0.0, texel.y) * spread);
+                    vec4 left = texture2D(u_buffer, samplePos - vec2(texel.x, 0.0) * spread);
+                    vec4 right = texture2D(u_buffer, samplePos + vec2(texel.x, 0.0) * spread);
+                    
+                    vec4 avgColor = (prevColor * 4.0 + up + down + left + right) / 8.0; 
+                    avgColor *= 0.995; 
+                    
+                    vec3 blended = max(avgColor.rgb, newColor * intensity * 0.8); 
+                    
+                    gl_FragColor = vec4(blended, 1.0);
+                }
+            `;
+
+            const drawFragmentShader = `
+                uniform sampler2D u_texture; 
+                uniform vec2 u_resolution;
+                
+                void main() {
+                    vec2 uv = gl_FragCoord.xy / u_resolution.xy; 
+                    vec4 simColor = texture2D(u_texture, uv);
+                    
+                    float density = length(simColor.rgb);
+                    vec3 baseColor = simColor.rgb;
+                    float maxVal = max(baseColor.r, max(baseColor.g, baseColor.b));
+                    
+                    vec3 vividColor = vec3(1.0);
+                    if (maxVal > 0.0001) {
+                        vividColor = baseColor / maxVal; 
+                    }
+                    
+                    vividColor = mix(vividColor, vec3(1.0), 0.15);
+                    float mask = smoothstep(0.01, 0.9, density * 2.5);
+                    vec3 finalColor = mix(vec3(1.0), vividColor, mask);
+                    
+                    gl_FragColor = vec4(finalColor, 1.0);
+                }
+            `;
+
+            simMaterial = new THREE.ShaderMaterial({
+                uniforms: { 
+                    u_buffer: { value: null }, 
+                    u_resolution: { value: size }, 
+                    u_mouse: { value: new THREE.Vector2(-10, -10) }, 
+                    u_time: { value: 0 }, 
+                    u_is_moving: { value: 0.0 }, 
+                    u_dt: { value: 0.016 } 
+                },
+                vertexShader: `void main() { gl_Position = vec4(position, 1.0); }`, 
+                fragmentShader: simFragmentShader
+            });
+
+            drawMaterial = new THREE.ShaderMaterial({
+                uniforms: { u_texture: { value: null }, u_resolution: { value: size } },
+                vertexShader: `void main() { gl_Position = vec4(position, 1.0); }`, 
+                fragmentShader: drawFragmentShader
+            });
+
+            const plane = new THREE.PlaneGeometry(2, 2);
+            simQuad = new THREE.Mesh(plane, simMaterial); 
+            drawQuad = new THREE.Mesh(plane, drawMaterial);
+            
+            simScene = new THREE.Scene(); simScene.add(simQuad); 
+            drawScene = new THREE.Scene(); drawScene.add(drawQuad);
+
+            animate();
+        }
+
+        const clock = new THREE.Clock();
+        const mouse = new THREE.Vector2(-100, -100); 
+        let isMoving = 0.0; 
+        let moveTimeout;
+
+        function updateMouse(x, y) {
+            mouse.x = x / window.innerWidth; 
+            mouse.y = 1.0 - (y / window.innerHeight);
+            isMoving = 1.0; 
+            clearTimeout(moveTimeout); 
+            moveTimeout = setTimeout(() => { isMoving = 0.0; }, 100); 
+        }
+
+        window.addEventListener('mousemove', (e) => updateMouse(e.clientX, e.clientY));
+        window.addEventListener('touchmove', (e) => { 
+            if(e.touches.length > 0) updateMouse(e.touches[0].clientX, e.touches[0].clientY); 
+        });
+
+        window.addEventListener('resize', () => {
+            const width = window.innerWidth; const height = window.innerHeight;
+            if (renderer) renderer.setSize(width, height); 
+            if (targetA) targetA.setSize(width, height); 
+            if (targetB) targetB.setSize(width, height);
+            if (simMaterial) simMaterial.uniforms.u_resolution.value.set(width, height); 
+            if (drawMaterial) drawMaterial.uniforms.u_resolution.value.set(width, height);
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (!simMaterial || !drawMaterial) return;
+            const time = clock.getElapsedTime(); 
+            const dt = clock.getDelta();
+            simMaterial.uniforms.u_buffer.value = targetA.texture; 
+            simMaterial.uniforms.u_time.value = time;
+            simMaterial.uniforms.u_mouse.value = mouse; 
+            simMaterial.uniforms.u_is_moving.value = isMoving; 
+            simMaterial.uniforms.u_dt.value = dt;
+            renderer.setRenderTarget(targetB); 
+            renderer.render(simScene, camera);
+            renderer.setRenderTarget(null); 
+            drawMaterial.uniforms.u_texture.value = targetB.texture; 
+            renderer.render(drawScene, camera);
+            let temp = targetA; targetA = targetB; targetB = temp;
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+             initThreeJS();
+        });
+
+    </script>
+</body>
+</html>

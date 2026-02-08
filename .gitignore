@@ -1,0 +1,6 @@
+# API キーを含むためコミットしない
+backend/.env
+backend/node_modules/
+node_modules/
+.DS_Store
+images/sora-*.mp4

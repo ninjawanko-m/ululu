@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Sora バックエンドを起動",
+      "type": "shell",
+      "command": "node",
+      "args": ["${workspaceFolder}/scripts/start-sora-backend.js"],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {}
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true,
+        "clear": true
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "runOptions": {
+        "runOn": "default"
+      }
+    }
+  ]
+}

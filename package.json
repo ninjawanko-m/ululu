@@ -1,0 +1,8 @@
+{
+  "name": "ululu",
+  "private": true,
+  "scripts": {
+    "start:sora": "node scripts/start-sora-backend.js",
+    "start:site": "python3 -m http.server 8080"
+  }
+}
