@@ -13,6 +13,6 @@ if [ -z "$TOKEN" ]; then
 fi
 echo "push 中...（進捗を表示します）"
 git remote set-url origin "https://ninjawanko-m:${TOKEN}@github.com/ninjawanko-m/ululu.git"
-git push -u origin main --progress
+git push -u origin main --progress --force
 git remote set-url origin "$REMOTE"
 echo "完了: https://ninjawanko-m.github.io/ululu/"

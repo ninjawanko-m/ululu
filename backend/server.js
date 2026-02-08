@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import OpenAI from 'openai';
+import Replicate from 'replicate';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -9,22 +10,78 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const IMAGES_DIR = path.join(PROJECT_ROOT, 'images');
 const FALLBACK_VIDEO_URL = '/images/5.mp4';
+const HISTORY_FILE = path.join(PROJECT_ROOT, 'generated-videos.json');
+const COMMENTS_FILE = path.join(PROJECT_ROOT, 'video-comments.json');
+const LIKES_FILE = path.join(PROJECT_ROOT, 'video-likes.json');
+
+function loadHistory() {
+  try {
+    if (fs.existsSync(HISTORY_FILE)) {
+      return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
+    }
+  } catch (_) {}
+  return [];
+}
+
+function saveHistory(entry) {
+  try {
+    const history = loadHistory();
+    history.unshift(entry);
+    fs.writeFileSync(HISTORY_FILE, JSON.stringify(history.slice(0, 50), null, 2), 'utf8');
+  } catch (err) {
+    console.error('履歴保存エラー:', err);
+  }
+}
+
+function loadComments() {
+  try {
+    if (fs.existsSync(COMMENTS_FILE)) {
+      return JSON.parse(fs.readFileSync(COMMENTS_FILE, 'utf8'));
+    }
+  } catch (_) {}
+  return {};
+}
+
+function saveComment(videoUrl, comment) {
+  try {
+    const comments = loadComments();
+    if (!comments[videoUrl]) comments[videoUrl] = [];
+    comments[videoUrl].push(comment);
+    fs.writeFileSync(COMMENTS_FILE, JSON.stringify(comments, null, 2), 'utf8');
+  } catch (err) {
+    console.error('コメント保存エラー:', err);
+  }
+}
+
+function loadLikes() {
+  try {
+    if (fs.existsSync(LIKES_FILE)) {
+      return JSON.parse(fs.readFileSync(LIKES_FILE, 'utf8'));
+    }
+  } catch (_) {}
+  return {};
+}
+
+function saveLikes(likes) {
+  try {
+    fs.writeFileSync(LIKES_FILE, JSON.stringify(likes, null, 2), 'utf8');
+  } catch (err) {
+    console.error('いいね保存エラー:', err);
+  }
+}
+
 const LIMITS = {
-  perMinute: 2,
-  perDay: 5,
-  promptMaxChars: 200,
-  seconds: '4',
-  size: '720x1280'
+  perMinute: 10,
+  perDay: 50,
+  promptMaxChars: 500,
+  seconds: '8',
+  size: '1280x720'
 };
 const rateState = new Map();
 
 const app = express();
-app.use(express.json());
 
-// 静的ファイル（生成した動画を返すため）
-app.use('/images', express.static(IMAGES_DIR));
-
-// CORS（フロントと別ポートで動かすため）
+// CORS（フロントと別ポートで動かすため）- 最初に設定
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -33,10 +90,104 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use(express.json());
+
+// 静的ファイル（生成した動画を返すため）
+app.use('/images', express.static(IMAGES_DIR));
+
+/** 生成履歴を取得（全ユーザーの動画を表示） */
+app.get('/api/generated-videos', (req, res) => {
+  const sort = req.query.sort || 'recent'; // 'recent' or 'popular'
+  const history = loadHistory();
+  const comments = loadComments();
+  const likes = loadLikes();
+  
+  let videos = history.map(v => ({
+    ...v,
+    comments: comments[v.videoUrl] || [],
+    likes: likes[v.videoUrl] || 0
+  }));
+  
+  // ソート
+  if (sort === 'popular') {
+    videos.sort((a, b) => b.likes - a.likes);
+  }
+  
+  return res.json({ videos });
+});
+
+/** いいねを追加 */
+app.post('/api/likes', (req, res) => {
+  const { videoUrl } = req.body || {};
+  if (!videoUrl) {
+    return res.status(400).json({ error: 'videoUrl が必要です。' });
+  }
+  
+  // URLを正規化（絶対URLを相対URLに変換）
+  const normalizedUrl = videoUrl.replace(/^https?:\/\/[^/]+/, '');
+  
+  const likes = loadLikes();
+  likes[normalizedUrl] = (likes[normalizedUrl] || 0) + 1;
+  saveLikes(likes);
+  
+  return res.json({ likes: likes[normalizedUrl] });
+});
+
+/** 動画にコメントを投稿 */
+app.post('/api/comments', (req, res) => {
+  const { videoUrl, name, comment } = req.body || {};
+  if (!videoUrl || !name || !comment) {
+    return res.status(400).json({ error: 'videoUrl, name, comment が必要です。' });
+  }
+  
+  // URLを正規化（絶対URLを相対URLに変換）
+  const normalizedUrl = videoUrl.replace(/^https?:\/\/[^/]+/, '');
+  
+  const entry = {
+    name: name.trim().slice(0, 50),
+    comment: comment.trim().slice(0, 200),
+    createdAt: Date.now()
+  };
+  saveComment(normalizedUrl, entry);
+  return res.json({ ok: true });
+});
+
+/** 日本語を英語に翻訳（Google Translate非公式API） */
+app.post('/api/translate', async (req, res) => {
+  const { text } = req.body || {};
+  if (!text || typeof text !== 'string') {
+    return res.status(400).json({ error: 'text が必要です。' });
+  }
+  
+  try {
+    // Google Translate非公式APIを使用（無料）
+    const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=ja&tl=en&dt=t&q=' + encodeURIComponent(text);
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    // レスポンス形式: [[[translated, original, ...]]]
+    if (data && data[0] && data[0][0] && data[0][0][0]) {
+      const translated = data[0].map(item => item[0]).join('');
+      return res.json({ translated });
+    }
+    
+    return res.status(500).json({ error: '翻訳に失敗しました。' });
+  } catch (err) {
+    console.error('翻訳エラー:', err);
+    return res.status(500).json({ error: err.message || '翻訳に失敗しました。' });
+  }
+});
+
 function getOpenAI() {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
   return new OpenAI({ apiKey: key });
+}
+
+function getReplicate() {
+  const key = process.env.REPLICATE_API_TOKEN;
+  if (!key) return null;
+  return new Replicate({ auth: key });
 }
 
 function getClientKey(req) {
@@ -74,70 +225,235 @@ function checkRateLimit(clientKey) {
 
 // 生成した動画のID → ローカルパス
 const downloadedVideos = new Map();
+const replicatePredictions = new Map();
 
-/** Soraで動画生成を開始 */
-app.post('/api/generate-video', async (req, res) => {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({
-      error: 'OPENAI_API_KEY が設定されていません。backend/.env に設定してください。',
-      needSetup: true
-    });
-  }
-
+/** Replicate（無料）で動画生成を開始 */
+app.post('/api/generate-video-free', async (req, res) => {
   const { prompt } = req.body || {};
   if (!prompt || typeof prompt !== 'string') {
     return res.status(400).json({ error: 'prompt を送信してください。' });
   }
-  if (prompt.length > LIMITS.promptMaxChars) {
-    return res.status(400).json({ error: `プロンプトは最大 ${LIMITS.promptMaxChars} 文字までです。` });
-  }
 
-  const clientKey = getClientKey(req);
-  const limit = checkRateLimit(clientKey);
-  if (!limit.ok) {
-    return res.status(429).json({
-      error: '利用制限に達しました。しばらく待ってから再試行してください。',
-      reason: 'rate_limit',
-      retryAfter: limit.retryAfter
-    });
-  }
-
-  const openai = getOpenAI();
-  if (!openai) {
+  const replicate = getReplicate();
+  if (!replicate) {
     return res.status(500).json({
-      error: 'OPENAI_API_KEY が設定されていません。backend/.env に設定してください。',
+      error: 'REPLICATE_API_TOKEN が設定されていません。',
       needSetup: true
     });
   }
+
+  try {
+    // AnimateDiffを使用（アニメーション特化）
+    const enhancedPrompt = `Cute animated character, ${prompt.trim()}, colorful anime style with onomatopoeia text effects, dynamic motion, vibrant colors, simple background`;
+    
+    const prediction = await replicate.predictions.create({
+      version: "1531004ee4c98bad9d6e8b6a2f3e236c8c836e0c94b1d15d5d98f5b47e7b8e3f", // AnimateDiff
+      input: {
+        prompt: enhancedPrompt,
+        num_frames: 16,
+        guidance_scale: 7.5
+      }
+    });
+
+    replicatePredictions.set(prediction.id, { prompt: prompt.trim() });
+    return res.json({
+      videoId: prediction.id,
+      status: 'processing',
+      provider: 'replicate'
+    });
+  } catch (err) {
+    console.error('Replicate生成エラー:', err);
+    return res.status(500).json({ error: err.message || 'Replicate API でエラーが発生しました。' });
+  }
+});
+
+/** Replicate動画の状態を取得 */
+app.get('/api/video-status-free/:videoId', async (req, res) => {
+  const { videoId } = req.params;
+  if (!videoId) return res.status(400).json({ error: 'videoId が必要です。' });
+
+  const replicate = getReplicate();
+  if (!replicate) {
+    return res.status(500).json({ error: 'REPLICATE_API_TOKEN が設定されていません。' });
+  }
+
+  try {
+    // すでにダウンロード済みならパスを返す
+    const cached = downloadedVideos.get(videoId);
+    if (cached) {
+      return res.json({
+        status: 'completed',
+        progress: 100,
+        videoUrl: cached
+      });
+    }
+
+    const prediction = await replicate.predictions.get(videoId);
+    const status = prediction.status;
+
+    if (status === 'succeeded' && prediction.output) {
+      // 動画をダウンロード
+      const videoUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
+      const response = await fetch(videoUrl);
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      
+      const safeName = videoId.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `replicate-${safeName}.mp4`;
+      const filepath = path.join(IMAGES_DIR, filename);
+      if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true });
+      fs.writeFileSync(filepath, buffer);
+      
+      const localUrl = `/images/${filename}`;
+      downloadedVideos.set(videoId, localUrl);
+      
+      const predData = replicatePredictions.get(videoId) || {};
+      saveHistory({ videoUrl: localUrl, prompt: predData.prompt || '', createdAt: Date.now() });
+      
+      return res.json({ status: 'completed', progress: 100, videoUrl: localUrl });
+    }
+
+    if (status === 'failed') {
+      return res.status(500).json({ error: prediction.error || '動画の生成に失敗しました。', status: 'failed' });
+    }
+
+    // processing状態
+    const progress = status === 'starting' ? 10 : status === 'processing' ? 50 : 0;
+    return res.json({ status, progress });
+  } catch (err) {
+    return res.status(500).json({
+      error: err.message || '状態の取得に失敗しました。'
+    });
+  }
+});
+
+/** Soraで動画生成を開始 */
+app.post('/api/generate-video', async (req, res) => {
+  const { prompt, userApiKey, speedMode } = req.body || {};
+  if (!prompt || typeof prompt !== 'string') {
+    return res.status(400).json({ error: 'prompt を送信してください。' });
+  }
+
+  // 速度モードの設定（Soraがサポートする長さ: 4, 8, 12秒のみ）
+  const SPEED_CONFIGS = {
+    fast: { seconds: '4', size: '1280x720', maxChars: 300 },      // 超高速（4秒）
+    normal: { seconds: '4', size: '1280x720', maxChars: 500 },    // 標準（4秒）
+    high: { seconds: '4', size: '1792x1024', maxChars: 1000 }     // 高品質（4秒・高解像度）
+  };
+  
+  const mode = speedMode || 'normal';
+  const config = SPEED_CONFIGS[mode] || SPEED_CONFIGS.normal;
+
+  // ユーザーが自分のAPIキーを提供した場合
+  let openai;
+  let usingUserKey = false;
+  let promptMaxChars = config.maxChars;
+  let seconds = config.seconds;
+  let size = config.size;
+
+  if (userApiKey && typeof userApiKey === 'string' && userApiKey.trim().startsWith('sk-')) {
+    // ユーザーのキーを使用（レート制限なし）
+    try {
+      openai = new OpenAI({ apiKey: userApiKey.trim() });
+      usingUserKey = true;
+    } catch (err) {
+      return res.status(400).json({ error: '無効なAPIキーです。' });
+    }
+  } else {
+    // サーバーのAPIキーを使用（レート制限あり）
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({
+        error: 'サーバーのAPIキーが設定されていません。自分のAPIキーを入力して生成してください。',
+        needSetup: true,
+        needUserKey: true
+      });
+    }
+
+    // 高品質モードはユーザーキーのみ
+    if (mode === 'high') {
+      return res.status(400).json({
+        error: '高品質モードは自分のAPIキーが必要です。',
+        needUserKey: true
+      });
+    }
+
+    const clientKey = getClientKey(req);
+    const limit = checkRateLimit(clientKey);
+    if (!limit.ok) {
+      return res.status(429).json({
+        error: '利用制限に達しました。自分のAPIキーを使用するか、しばらく待ってから再試行してください。',
+        reason: 'rate_limit',
+        retryAfter: limit.retryAfter,
+        needUserKey: true
+      });
+    }
+
+    openai = getOpenAI();
+    if (!openai) {
+      return res.status(500).json({
+        error: 'OPENAI_API_KEY が設定されていません。',
+        needSetup: true,
+        needUserKey: true
+      });
+    }
+  }
+
+  if (prompt.length > promptMaxChars) {
+    return res.status(400).json({ error: `プロンプトは最大 ${promptMaxChars} 文字までです。` });
+  }
+
+  // プロンプトをアニメーションキャラクター＋擬音スタイルに変換
+  const enhancedPrompt = `Cute animated character performing action with onomatopoeia text effects. ${prompt.trim()}. Style: colorful 2D animation, expressive cartoon character, Japanese anime style with visible sound effect text (like "ドカーン", "キラキラ", "ピョン"), dynamic motion, vibrant colors, simple background`;
+
   try {
     const video = await openai.videos.create({
       model: 'sora-2',
-      prompt: prompt.trim(),
-      size: LIMITS.size,
-      seconds: LIMITS.seconds
+      prompt: enhancedPrompt,
+      size: size,
+      seconds: seconds
     });
     return res.json({
       videoId: video.id,
       status: video.status,
-      progress: video.progress ?? 0
+      progress: video.progress ?? 0,
+      usingUserKey,
+      speedMode: mode
     });
   } catch (err) {
     const message = err.message || 'Sora API でエラーが発生しました。';
     const status = err.status === 401 ? 401 : err.status === 429 ? 429 : 500;
     const isBillingLimit = typeof message === 'string' &&
       message.toLowerCase().includes('billing hard limit');
+    
     if (isBillingLimit) {
-      return res.status(402).json({
-        error: message,
-        fallback: true,
-        videoUrl: FALLBACK_VIDEO_URL,
-        reason: 'billing_limit'
+      if (usingUserKey) {
+        return res.status(402).json({
+          error: 'あなたのAPIキーが課金上限に達しました。OpenAIダッシュボードで上限を確認してください。',
+          reason: 'billing_limit'
+        });
+      } else {
+        return res.status(402).json({
+          error: 'サーバーの課金上限に達しました。自分のAPIキーを使用してください。',
+          fallback: true,
+          videoUrl: FALLBACK_VIDEO_URL,
+          reason: 'billing_limit',
+          needUserKey: true
+        });
+      }
+    }
+
+    if (status === 401 && usingUserKey) {
+      return res.status(401).json({
+        error: 'APIキーが無効です。正しいキーを入力してください。',
+        needUserKey: true
       });
     }
+
     return res.status(status).json({
       error: message,
-      needSetup: status === 401
+      needSetup: status === 401 && !usingUserKey,
+      needUserKey: status === 401 || status === 429
     });
   }
 });
@@ -182,6 +498,7 @@ app.get('/api/video-status/:videoId', async (req, res) => {
       fs.writeFileSync(filepath, buffer);
       const videoUrl = `/images/${filename}`;
       downloadedVideos.set(videoId, videoUrl);
+      saveHistory({ videoUrl, prompt: video.prompt || '', createdAt: Date.now() });
       return res.json({ status: 'completed', progress: 100, videoUrl });
     }
 

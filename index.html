@@ -545,6 +545,109 @@
             color: var(--text-body);
             line-height: 1.7;
         }
+        .video-comments {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #f0f0f0;
+            background: #fafafa;
+        }
+        .video-comments h4 {
+            font-family: 'Italiana', serif;
+            font-size: 1rem;
+            color: var(--accent-pink);
+            margin: 0 0 0.75rem;
+        }
+        .comment-item {
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #eee;
+        }
+        .comment-item:last-child { border: none; }
+        .comment-name {
+            font-weight: bold;
+            font-size: 0.9rem;
+            color: var(--primary-color);
+            margin-bottom: 0.25rem;
+        }
+        .comment-text {
+            font-size: 0.9rem;
+            color: var(--text-body);
+            line-height: 1.5;
+        }
+        .comment-form {
+            margin-top: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .comment-form input,
+        .comment-form textarea {
+            padding: 0.6rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-family: inherit;
+        }
+        .comment-form textarea { min-height: 50px; resize: vertical; }
+        .comment-form button {
+            align-self: flex-start;
+            padding: 0.6rem 1.5rem;
+            background: var(--accent-pink);
+            color: #fff;
+            border: none;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .comment-form button:hover { opacity: 0.9; }
+        
+        /* いいねボタン */
+        .like-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: #fff;
+            border: 2px solid var(--accent-pink);
+            color: var(--accent-pink);
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            margin: 1rem 1.5rem 0.5rem;
+        }
+        .like-btn:hover {
+            background: var(--accent-pink);
+            color: #fff;
+        }
+        .like-btn.liked {
+            background: var(--accent-pink);
+            color: #fff;
+        }
+        
+        /* ソートボタン */
+        .sort-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            justify-content: center;
+        }
+        .sort-btn {
+            padding: 0.75rem 1.5rem;
+            background: #fff;
+            border: 2px solid var(--accent-pink);
+            color: var(--accent-pink);
+            border-radius: 20px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .sort-btn:hover, .sort-btn.active {
+            background: var(--accent-pink);
+            color: #fff;
+        }
 
         /* Sora 生成フォーム */
         .sora-form-box {
@@ -837,18 +940,52 @@
             <p style="color: var(--text-body); margin-bottom: 1rem;">お気に入りの動画を貼れます（YouTube / Vimeo / ローカル動画 / Soraで自動生成）</p>
 
             <div class="sora-form-box scroll-anim">
-                <h3>Sora で動画を自動生成</h3>
-                <p style="color: var(--text-body); font-size: 0.95rem; margin-bottom: 0.5rem;">プロンプトを入力して生成ボタンを押すと、Sora で動画が生成され、下の一覧に追加されます。</p>
-                <p style="color: var(--text-body); font-size: 0.85rem; margin-bottom: 1rem;">制限: 1分あたり2回 / 1日5回、最大4秒・720p、プロンプト200文字まで</p>
+                <h3>Sora で擬音アニメーション動画を自動生成</h3>
+                <p style="color: var(--text-body); font-size: 0.95rem; margin-bottom: 0.5rem;">
+                    🎨 <strong>アニメキャラクター＋擬音特化</strong>：入力したアクションが、かわいいアニメキャラと擬音テキスト付きの動画になります！
+                </p>
+                <p style="color: var(--text-body); font-size: 0.85rem; margin-bottom: 0.5rem;">
+                    <strong>サーバーのAPIキー:</strong> 1分あたり10回 / 1日50回、4秒・720p、プロンプト500文字<br>
+                    <strong>自分のAPIキー:</strong> 制限なし、4秒・最大1792x1024、プロンプト1000文字
+                </p>
                 <div class="form-row">
-                    <label class="form-label">プロンプト（英語推奨）</label>
-                    <textarea id="sora-prompt" class="form-control" placeholder="例: A cute cat playing with a ball of yarn in a sunny room" rows="3"></textarea>
+                    <label class="form-label">生成モード</label>
+                    <select id="generation-mode" class="form-control" style="margin-bottom: 0.75rem;">
+                        <option value="free" selected>🆓 無料モード（Replicate）</option>
+                        <option value="sora">⚡ Sora モード（有料・高品質）</option>
+                    </select>
+                    <small style="color: #888; font-size: 0.85rem;">無料モードは月$5の無料枠内で利用可能（Replicateアカウント必要）</small>
+                </div>
+                <div class="form-row">
+                    <label class="form-label">あなたのAPIキー（任意）</label>
+                    <input type="password" id="user-api-key" class="form-control" placeholder="sk-... (空欄ならサーバーのキーを使用)" style="margin-bottom: 0.75rem;">
+                    <small style="color: #888; font-size: 0.85rem;">自分のキーを入力すると、制限なしで高品質な動画を生成できます。<a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener" style="color: var(--accent-pink);">キーを取得</a></small>
+                </div>
+                <div class="form-row">
+                    <label class="form-label">生成速度</label>
+                    <select id="speed-mode" class="form-control" style="margin-bottom: 0.75rem;">
+                        <option value="fast">高速（4秒・720p・約20秒）</option>
+                        <option value="normal" selected>標準（4秒・720p・約20秒）</option>
+                        <option value="high">高品質（4秒・1792x1024・約20秒）※自分のAPIキーのみ</option>
+                    </select>
+                    <small style="color: #888; font-size: 0.85rem;">※全モード4秒（Sora APIの制約）。高品質は解像度が高くなります。</small>
+                </div>
+                <div class="form-row">
+                    <label class="form-label">アクション・動き（日本語OK）</label>
+                    <textarea id="sora-prompt" class="form-control" placeholder="例: 走る、ジャンプする、喜ぶ、驚く、キラキラ光る..." rows="3"></textarea>
+                    <button type="button" id="translate-btn" style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem;">🌐 日本語→英語に翻訳</button>
+                    <small style="color: #888; font-size: 0.85rem; margin-top: 0.5rem; display: block;">💡 自動的に「かわいいアニメキャラ＋擬音付き」スタイルで生成されます</small>
                 </div>
                 <button type="button" id="sora-generate-btn" class="sora-generate-btn">Sora で生成</button>
                 <div id="sora-progress" class="sora-progress" style="display: none;"></div>
                 <div id="sora-error" class="sora-error" style="display: none;"></div>
                 <div id="sora-setup-hint" class="sora-setup-hint" style="display: none;"></div>
                 <a id="sora-setup-btn" href="#" target="_blank" rel="noopener" class="sora-setup-btn" style="display: none;">API キーを設定する</a>
+            </div>
+
+            <div class="sort-controls">
+                <button class="sort-btn active" data-sort="recent">🕒 最新順</button>
+                <button class="sort-btn" data-sort="popular">❤️ 人気順</button>
             </div>
 
             <div class="video-grid">
@@ -913,11 +1050,54 @@
 
     <script>
         // --- Loading Logic ---
+        let currentSort = 'recent';
+        
         document.addEventListener('DOMContentLoaded', () => {
             const loadingScreen = document.getElementById('loading-screen');
             const loadingBar = document.getElementById('loading-bar');
             const pageContainer = document.querySelector('.page-container');
             const body = document.body;
+            
+            // ソートボタン
+            document.querySelectorAll('.sort-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentSort = btn.dataset.sort;
+                    loadVideos(currentSort);
+                });
+            });
+            
+            // 動画を読み込む関数
+            function loadVideos(sort = 'recent') {
+                const videoGrid = document.querySelector('.video-grid');
+                // 既存の生成動画を削除（サンプル動画は残す）
+                videoGrid.querySelectorAll('.video-item').forEach(item => {
+                    if (item.querySelector('.video-title')?.textContent.includes('みんなの生成動画') || 
+                        item.querySelector('.video-title')?.textContent.includes('Sora で生成')) {
+                        item.remove();
+                    }
+                });
+                
+                fetch(SORA_API_BASE + '/api/generated-videos?sort=' + sort)
+                    .then(r => r.json())
+                    .then(data => {
+                        const videos = data.videos || [];
+                        // 人気順の場合はそのまま、最新順の場合は逆順
+                        const displayVideos = sort === 'recent' ? videos.reverse() : videos;
+                        displayVideos.forEach(v => {
+                            if (v.videoUrl) {
+                                const url = v.videoUrl.startsWith('http') ? v.videoUrl : (SORA_API_BASE + v.videoUrl);
+                                const desc = (v.prompt || '').slice(0, 80) + ((v.prompt || '').length > 80 ? '...' : '');
+                                addVideoItem('みんなの生成動画', desc, url, v.comments || [], v.likes || 0);
+                            }
+                        });
+                    })
+                    .catch(() => {});
+            }
+            
+            // 初回読み込み
+            loadVideos('recent');
             
             let progress = 0;
             const timer = setInterval(() => {
@@ -1049,12 +1229,64 @@
         // --- Sora 動画自動生成 ---
         const SORA_API_BASE = 'http://localhost:3001';
         const soraPrompt = document.getElementById('sora-prompt');
+        const userApiKeyInput = document.getElementById('user-api-key');
+        const speedModeSelect = document.getElementById('speed-mode');
+        const generationModeSelect = document.getElementById('generation-mode');
+        const translateBtn = document.getElementById('translate-btn');
         const soraGenerateBtn = document.getElementById('sora-generate-btn');
         const soraProgress = document.getElementById('sora-progress');
         const soraError = document.getElementById('sora-error');
         const soraSetupHint = document.getElementById('sora-setup-hint');
         const soraSetupBtn = document.getElementById('sora-setup-btn');
         const videoGrid = document.querySelector('.video-grid');
+
+        // 生成モード変更時にUIを更新
+        generationModeSelect.addEventListener('change', () => {
+            const isFree = generationModeSelect.value === 'free';
+            userApiKeyInput.closest('.form-row').style.display = isFree ? 'none' : 'block';
+            speedModeSelect.closest('.form-row').style.display = isFree ? 'none' : 'block';
+            soraGenerateBtn.textContent = isFree ? '🆓 無料で生成' : 'Sora で生成';
+        });
+
+        // 日本語を英語に翻訳
+        translateBtn.addEventListener('click', async () => {
+            const text = soraPrompt.value.trim();
+            if (!text) {
+                alert('翻訳するテキストを入力してください。');
+                return;
+            }
+            
+            // 既に英語の場合はスキップ
+            if (!/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]/.test(text)) {
+                alert('既に英語のようです。');
+                return;
+            }
+            
+            translateBtn.disabled = true;
+            translateBtn.textContent = '翻訳中...';
+            
+            try {
+                const res = await fetch(SORA_API_BASE + '/api/translate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+                const data = await res.json();
+                if (res.ok && data.translated) {
+                    soraPrompt.value = data.translated;
+                    translateBtn.textContent = '✓ 翻訳完了';
+                    setTimeout(() => {
+                        translateBtn.textContent = '🌐 日本語→英語に翻訳';
+                    }, 2000);
+                } else {
+                    alert(data.error || '翻訳に失敗しました。');
+                }
+            } catch (err) {
+                alert('翻訳サーバーに接続できません。');
+            } finally {
+                translateBtn.disabled = false;
+            }
+        });
 
         function showSoraError(msg, showHint) {
             soraError.textContent = msg;
@@ -1076,36 +1308,139 @@
             soraSetupHint.style.display = 'none';
             soraSetupBtn.style.display = 'none';
         }
-        function addVideoItem(title, desc, videoUrl) {
+        function addVideoItem(title, desc, videoUrl, comments = [], likes = 0) {
             const item = document.createElement('div');
             item.className = 'video-item scroll-anim visible';
-            item.innerHTML = '<div class="video-card"><div class="video-wrapper"><video controls playsinline><source src="' + videoUrl + '" type="video/mp4"></video></div><div class="video-caption"><div class="video-title">' + escapeHtml(title) + '</div><p class="video-desc">' + escapeHtml(desc) + '</p></div></div>';
+            item.dataset.videoUrl = videoUrl; // 動画URLを保存
+            
+            // いいねボタン
+            const likeBtn = '<button class="like-btn" data-video-url="' + videoUrl + '"><span class="like-icon">❤️</span><span class="like-count">' + likes + '</span></button>';
+            
+            let commentsHtml = '<div class="video-comments"><h4>コメント (' + comments.length + ')</h4><div class="comments-list">';
+            comments.forEach(c => {
+                const date = new Date(c.createdAt).toLocaleDateString('ja-JP');
+                commentsHtml += '<div class="comment-item"><div class="comment-name">' + escapeHtml(c.name) + ' - ' + date + '</div><div class="comment-text">' + escapeHtml(c.comment) + '</div></div>';
+            });
+            commentsHtml += '</div><form class="comment-form" data-video-url="' + videoUrl + '"><input type="text" name="name" placeholder="お名前" required maxlength="50"><textarea name="comment" placeholder="コメントを入力..." required maxlength="200"></textarea><button type="submit">投稿</button></form></div>';
+            item.innerHTML = '<div class="video-card"><div class="video-wrapper"><video controls playsinline><source src="' + videoUrl + '" type="video/mp4"></video></div><div class="video-caption"><div class="video-title">' + escapeHtml(title) + '</div><p class="video-desc">' + escapeHtml(desc) + '</p>' + likeBtn + '</div>' + commentsHtml + '</div>';
             videoGrid.insertBefore(item, videoGrid.firstChild);
             observer.observe(item);
+            
+            // いいねボタンのイベントリスナー
+            const likeBtnEl = item.querySelector('.like-btn');
+            likeBtnEl.addEventListener('click', async () => {
+                if (likeBtnEl.classList.contains('liked')) return; // 1回のみ
+                
+                try {
+                    const res = await fetch(SORA_API_BASE + '/api/likes', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ videoUrl: likeBtnEl.dataset.videoUrl })
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        likeBtnEl.querySelector('.like-count').textContent = data.likes;
+                        likeBtnEl.classList.add('liked');
+                    }
+                } catch (err) {
+                    console.error('いいね失敗:', err);
+                }
+            });
+            
+            // コメントフォームにイベントリスナーを追加
+            const form = item.querySelector('.comment-form');
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(form);
+                const name = formData.get('name').trim();
+                const comment = formData.get('comment').trim();
+                if (!name || !comment) return;
+                
+                const submitBtn = form.querySelector('button');
+                submitBtn.disabled = true;
+                submitBtn.textContent = '投稿中...';
+                
+                try {
+                    const res = await fetch(SORA_API_BASE + '/api/comments', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ videoUrl: form.dataset.videoUrl, name, comment })
+                    });
+                    if (res.ok) {
+                        // コメントをその場で追加
+                        const commentsList = form.previousElementSibling;
+                        const commentItem = document.createElement('div');
+                        commentItem.className = 'comment-item';
+                        const date = new Date().toLocaleDateString('ja-JP');
+                        commentItem.innerHTML = '<div class="comment-name">' + escapeHtml(name) + ' - ' + date + '</div><div class="comment-text">' + escapeHtml(comment) + '</div>';
+                        commentsList.appendChild(commentItem);
+                        
+                        // コメント数を更新
+                        const commentsSection = item.querySelector('.video-comments');
+                        const h4 = commentsSection.querySelector('h4');
+                        const currentCount = commentsList.querySelectorAll('.comment-item').length;
+                        h4.textContent = 'コメント (' + currentCount + ')';
+                        
+                        form.reset();
+                        submitBtn.textContent = '✓ 投稿完了';
+                        setTimeout(() => {
+                            submitBtn.textContent = '投稿';
+                        }, 2000);
+                    } else {
+                        alert('コメント投稿に失敗しました。');
+                    }
+                } catch (err) {
+                    alert('コメント投稿に失敗しました。');
+                } finally {
+                    submitBtn.disabled = false;
+                }
+            });
         }
 
         soraGenerateBtn.addEventListener('click', async () => {
             const prompt = (soraPrompt.value || '').trim();
+            const generationMode = generationModeSelect.value;
+            const userApiKey = (userApiKeyInput.value || '').trim();
+            const speedMode = speedModeSelect.value;
+            
             if (!prompt) {
                 showSoraError('プロンプトを入力してください。');
                 return;
             }
+            
+            // 高品質モードはユーザーのAPIキーが必要
+            if (generationMode === 'sora' && speedMode === 'high' && !userApiKey) {
+                showSoraError('高品質モードは自分のAPIキーが必要です。');
+                return;
+            }
+            
             soraGenerateBtn.disabled = true;
             hideSoraMessages();
             soraProgress.style.display = 'block';
             soraProgress.textContent = 'リクエスト送信中...';
 
             try {
-                const createRes = await fetch(SORA_API_BASE + '/api/generate-video', {
+                // 無料モードかSoraモードか
+                const endpoint = generationMode === 'free' ? '/api/generate-video-free' : '/api/generate-video';
+                const body = generationMode === 'free' 
+                    ? { prompt }
+                    : { prompt, userApiKey: userApiKey || undefined, speedMode };
+                
+                const createRes = await fetch(SORA_API_BASE + endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt })
+                    body: JSON.stringify(body)
                 });
                 const createData = await createRes.json();
                 if (!createRes.ok) {
+                    if (createData.needUserKey) {
+                        showSoraError(createData.error || 'エラーが発生しました。自分のAPIキーを入力してください。');
+                        soraGenerateBtn.disabled = false;
+                        return;
+                    }
                     if (createData.fallback && createData.videoUrl) {
-                        const fallbackUrl = createData.videoUrl.startsWith('http') ? createData.videoUrl : (window.location.origin + createData.videoUrl);
-                        addVideoItem('フォールバック動画', '課金上限のためローカル動画を表示しています。', fallbackUrl);
+                        const fallbackUrl = createData.videoUrl.startsWith('http') ? createData.videoUrl : (SORA_API_BASE + createData.videoUrl);
+                        addVideoItem('フォールバック動画', 'サーバーの課金上限のためローカル動画を表示しています。自分のAPIキーで生成できます。', fallbackUrl, [], 0);
                         soraProgress.style.display = 'none';
                         soraPrompt.value = '';
                         soraGenerateBtn.disabled = false;
@@ -1121,28 +1456,56 @@
                     return;
                 }
                 const videoId = createData.videoId;
-                soraProgress.textContent = '生成中... 0%';
+                
+                // 疑似進捗表示（滑らかに）
+                let fakeProgress = 0;
+                const progressInterval = setInterval(() => {
+                    if (fakeProgress < 95) {
+                        fakeProgress += Math.random() * 3;
+                        soraProgress.textContent = '生成中... ' + Math.floor(fakeProgress) + '%';
+                    }
+                }, 500);
 
                 const poll = async () => {
-                    const statusRes = await fetch(SORA_API_BASE + '/api/video-status/' + encodeURIComponent(videoId));
+                    const statusEndpoint = generationMode === 'free' 
+                        ? SORA_API_BASE + '/api/video-status-free/' + encodeURIComponent(videoId)
+                        : SORA_API_BASE + '/api/video-status/' + encodeURIComponent(videoId);
+                    
+                    const statusRes = await fetch(statusEndpoint);
                     const statusData = await statusRes.json();
                     if (!statusRes.ok) {
+                        clearInterval(progressInterval);
                         showSoraError(statusData.error || '状態の取得に失敗しました。');
                         return;
                     }
                     const status = statusData.status;
-                    const progress = statusData.progress ?? 0;
-                    soraProgress.textContent = status === 'completed' ? '完了！' : '生成中... ' + progress + '%';
+                    const progress = statusData.progress ?? fakeProgress;
+                    
+                    if (status === 'completed') {
+                        clearInterval(progressInterval);
+                        soraProgress.textContent = '完了！100%';
+                    } else {
+                        soraProgress.textContent = '生成中... ' + Math.floor(Math.max(progress, fakeProgress)) + '%';
+                    }
 
                     if (status === 'completed' && statusData.videoUrl) {
-                        const videoUrl = statusData.videoUrl.startsWith('http') ? statusData.videoUrl : (window.location.origin + statusData.videoUrl);
-                        addVideoItem('Sora で生成', prompt.slice(0, 80) + (prompt.length > 80 ? '...' : ''), videoUrl);
+                        const videoUrl = statusData.videoUrl.startsWith('http') ? statusData.videoUrl : (SORA_API_BASE + statusData.videoUrl);
+                        const usingUserKey = createData.usingUserKey;
+                        const modeLabel = generationMode === 'free' ? '無料モード' : 'Sora';
+                        const qualityLabel = generationMode === 'free' ? '' : (speedMode === 'fast' ? '高速' : speedMode === 'high' ? '高品質' : '標準');
+                        const keyLabel = generationMode === 'free' ? '' : (usingUserKey ? '（あなたのAPIキー使用）' : '（サーバーのAPIキー使用）');
+                        const title = modeLabel + (qualityLabel ? ' - ' + qualityLabel : '') + ' ' + keyLabel;
+                        addVideoItem(title, prompt.slice(0, 80) + (prompt.length > 80 ? '...' : ''), videoUrl, [], 0);
                         soraProgress.style.display = 'none';
                         soraPrompt.value = '';
+                        if (usingUserKey) {
+                            userApiKeyInput.value = ''; // セキュリティのためクリア
+                        }
                     } else if (status === 'failed') {
+                        clearInterval(progressInterval);
                         showSoraError(statusData.error || '動画の生成に失敗しました。');
                     } else {
-                        setTimeout(poll, 5000);
+                        setTimeout(poll, 2000); // 5秒→2秒に短縮
                         return;
                     }
                     soraGenerateBtn.disabled = false;
