@@ -281,8 +281,13 @@ app.get('/api/video-status-free/:videoId', async (req, res) => {
         return res.json({ status: 'processing', progress });
       }
       
-      // 3秒後に完成
-      const localUrl = FALLBACK_VIDEO_URL; // images/5.mp4 を使用
+      // 3秒後に完成 - ランダムに動画を選択
+      const videoFiles = fs.readdirSync(IMAGES_DIR)
+        .filter(f => f.endsWith('.mp4'))
+        .map(f => `/images/${f}`);
+      
+      // ランダムに1つ選ぶ
+      const localUrl = videoFiles[Math.floor(Math.random() * videoFiles.length)] || FALLBACK_VIDEO_URL;
       downloadedVideos.set(videoId, localUrl);
       saveHistory({ videoUrl: localUrl, prompt: predData.prompt || '', createdAt: Date.now() });
       
