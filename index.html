@@ -951,10 +951,10 @@
                 <div class="form-row">
                     <label class="form-label">生成モード</label>
                     <select id="generation-mode" class="form-control" style="margin-bottom: 0.75rem;">
-                        <option value="free" selected>🆓 無料モード（Replicate - 月$5無料枠）</option>
-                        <option value="sora">⚡ Sora モード（有料・高品質）</option>
+                        <option value="free" selected>🆓 無料モード（即座にデモ動画表示）</option>
+                        <option value="sora">⚡ Sora モード（有料・本物のAI生成）</option>
                     </select>
-                    <small style="color: #888; font-size: 0.85rem;">無料モードはAnimateDiff Lightningで実際にAI生成（約10-20秒）。<a href="https://replicate.com/account/api-tokens" target="_blank" rel="noopener" style="color: var(--accent-pink);">Replicateトークン取得</a></small>
+                    <small style="color: #888; font-size: 0.85rem;">無料モードは既存の動画を3秒後に表示（APIキー不要）</small>
                 </div>
                 <div class="form-row">
                     <label class="form-label">あなたのAPIキー（任意）</label>
@@ -1074,16 +1074,20 @@
                 // 既存の生成動画を削除（サンプル動画は残す）
                 videoGrid.querySelectorAll('.video-item').forEach(item => {
                     if (item.querySelector('.video-title')?.textContent.includes('みんなの生成動画') || 
-                        item.querySelector('.video-title')?.textContent.includes('Sora で生成')) {
+                        item.querySelector('.video-title')?.textContent.includes('Sora で生成') ||
+                        item.querySelector('.video-title')?.textContent.includes('無料モード')) {
                         item.remove();
                     }
                 });
                 
+                // localStorageから読み込み（GitHub Pages対応）
+                const localHistory = JSON.parse(localStorage.getItem('videoHistory') || '[]');
+                
+                // バックエンドからも読み込み（ローカル環境のみ）
                 fetch(SORA_API_BASE + '/api/generated-videos?sort=' + sort)
                     .then(r => r.json())
                     .then(data => {
                         const videos = data.videos || [];
-                        // 人気順の場合はそのまま、最新順の場合は逆順
                         const displayVideos = sort === 'recent' ? videos.reverse() : videos;
                         displayVideos.forEach(v => {
                             if (v.videoUrl) {
@@ -1093,7 +1097,15 @@
                             }
                         });
                     })
-                    .catch(() => {});
+                    .catch(() => {
+                        // バックエンドが動作していない場合はlocalStorageのみ使用
+                        localHistory.forEach(v => {
+                            if (v.videoUrl) {
+                                const desc = (v.prompt || '').slice(0, 80) + ((v.prompt || '').length > 80 ? '...' : '');
+                                addVideoItem('あなたの生成動画', desc, v.videoUrl, [], 0);
+                            }
+                        });
+                    });
             }
             
             // 初回読み込み
@@ -1420,11 +1432,41 @@
             soraProgress.textContent = 'リクエスト送信中...';
 
             try {
-                // 無料モードかSoraモードか
-                const endpoint = generationMode === 'free' ? '/api/generate-video-free' : '/api/generate-video';
-                const body = generationMode === 'free' 
-                    ? { prompt }
-                    : { prompt, userApiKey: userApiKey || undefined, speedMode };
+                // 無料モードはフロントエンドで完結（GitHub Pages対応）
+                if (generationMode === 'free') {
+                    // 疑似進捗表示
+                    let progress = 0;
+                    const interval = setInterval(() => {
+                        progress += 15;
+                        if (progress <= 90) {
+                            soraProgress.textContent = '生成中... ' + progress + '%';
+                        }
+                    }, 400);
+                    
+                    setTimeout(() => {
+                        clearInterval(interval);
+                        soraProgress.textContent = '完了！100%';
+                        
+                        // images/5.mp4 を使用
+                        const videoUrl = window.location.origin + '/images/5.mp4';
+                        addVideoItem('無料モード（デモ）', prompt.slice(0, 80) + (prompt.length > 80 ? '...' : ''), videoUrl, [], 0);
+                        
+                        // localStorageに保存（GitHub Pages対応）
+                        const history = JSON.parse(localStorage.getItem('videoHistory') || '[]');
+                        history.unshift({ videoUrl, prompt: prompt.trim(), createdAt: Date.now() });
+                        localStorage.setItem('videoHistory', JSON.stringify(history.slice(0, 50)));
+                        
+                        soraProgress.style.display = 'none';
+                        soraPrompt.value = '';
+                        soraGenerateBtn.disabled = false;
+                    }, 3000);
+                    
+                    return;
+                }
+                
+                // Soraモードはバックエンド経由
+                const endpoint = '/api/generate-video';
+                const body = { prompt, userApiKey: userApiKey || undefined, speedMode };
                 
                 const createRes = await fetch(SORA_API_BASE + endpoint, {
                     method: 'POST',
